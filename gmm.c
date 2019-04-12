@@ -133,18 +133,24 @@ int main(int argl, char* argv[]) {
     for (i=0; i<NUM_COMPONENTS; ++i) {
         gsl_matrix_memcpy(sigmas[i], general_sigma);
     }
+
+    // clean up temporary variables
     gsl_vector_free(tmp);
+    gsl_vector_free(general_mean);
+    gsl_matrix_free(general_sigma);
 
     // calculate
-	// Expectation step
-    expectation_step((const gsl_vector**) data_points, data_size, priors,
-                        (const gsl_vector**) mus, (const gsl_matrix**) sigmas,
-                        posterior);
-    
-    // Maximisation step
-    maximization_step((const gsl_vector**) data_points, data_size, posterior,
-                        priors, mus, sigmas);
-	//priors, mus, Sigma = maximization_step(data, posterior)
+    for (i=0; i<50; ++i) {
+        // Expectation step
+        expectation_step((const gsl_vector**) data_points, data_size, priors,
+                            (const gsl_vector**) mus, (const gsl_matrix**) sigmas,
+                            posterior);
+        
+        // Maximisation step
+        maximization_step((const gsl_vector**) data_points, data_size, posterior,
+                            priors, mus, sigmas);
+        //priors, mus, Sigma = maximization_step(data, posterior)
+    }
 
 
     // clean up
@@ -155,6 +161,7 @@ int main(int argl, char* argv[]) {
         gsl_vector_free(mus[i]);
         gsl_matrix_free(sigmas[i]);
     }
+    gsl_matrix_free(posterior);
 
     return 0;
 }
@@ -177,6 +184,10 @@ void expectation_step(const gsl_vector** data, const unsigned int data_size,
         gsl_vector_scale(current_row, 1/row_sum);
         gsl_matrix_set_row(posterior, i, current_row);
     }
+
+    // clean up
+    gsl_vector_free(workspace);
+    gsl_vector_free(current_row);
 }
 
 void maximization_step(const gsl_vector** data, const unsigned int data_size,
@@ -218,4 +229,7 @@ void maximization_step(const gsl_vector** data, const unsigned int data_size,
         }
         gsl_matrix_scale(new_sigmas[k], 1/posterior_sums[k]);
     }
+
+    // clean up
+    gsl_vector_free(tmp);
 }
