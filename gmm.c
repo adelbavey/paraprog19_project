@@ -86,10 +86,10 @@ int main(int argl, char* argv[]) {
     // posterior, a number for every pair of data point and component
     gsl_matrix* posterior = gsl_matrix_alloc(data_size, NUM_COMPONENTS);
 
-    // "mu" the mean of each component
-    gsl_vector* mu[NUM_COMPONENTS];
+    // "mus" the mean of each component
+    gsl_vector* mus[NUM_COMPONENTS];
     for (i=0; i<NUM_COMPONENTS; ++i) {
-        mu[i] = gsl_vector_alloc(DIM);
+        mus[i] = gsl_vector_alloc(DIM);
     }
 
     // finally reserve space for the sigmas, which are covariance matrices for each component
@@ -101,9 +101,7 @@ int main(int argl, char* argv[]) {
 
     // initialise the means by "randomly" picking data points
     for (i=0; i<NUM_COMPONENTS; ++i) {
-        for (j=0; j<DIM; ++j) {
-            mu[i][j] = data_points[i][j];
-        }
+        gsl_vector_memcpy(mus[i], data_points[i]);
     }
 
     // compute an initial variance-covariance which is the same for every component
@@ -140,11 +138,13 @@ int main(int argl, char* argv[]) {
     // calculate
 	// Expectation step
     expectation_step((const gsl_vector**) data_points, data_size, priors,
-                        (const gsl_vector**) mu, (const gsl_matrix**) sigmas,
+                        (const gsl_vector**) mus, (const gsl_matrix**) sigmas,
                         posterior);
     
     // Maximisation step
-	//priors, mu, Sigma = maximization_step(data, posterior)
+    maximization_step((const gsl_vector**) data_points, data_size, posterior,
+                        priors, mus, sigmas);
+	//priors, mus, Sigma = maximization_step(data, posterior)
 
 
     // clean up
@@ -152,7 +152,7 @@ int main(int argl, char* argv[]) {
         gsl_vector_free(data_points[i]);
     }
     for (i=0; i<NUM_COMPONENTS; ++i) {
-        gsl_vector_free(mu[i]);
+        gsl_vector_free(mus[i]);
         gsl_matrix_free(sigmas[i]);
     }
 
@@ -176,5 +176,46 @@ void expectation_step(const gsl_vector** data, const unsigned int data_size,
         }
         gsl_vector_scale(current_row, 1/row_sum);
         gsl_matrix_set_row(posterior, i, current_row);
+    }
+}
+
+void maximization_step(const gsl_vector** data, const unsigned int data_size,
+                        const gsl_matrix* posterior,
+                        double* new_priors, gsl_vector** new_means,
+                        gsl_matrix** new_sigmas) {
+    int i,k;
+    // first calculate the component wise sum of the posterior
+    double posterior_sums[NUM_COMPONENTS];
+    for (k=0; k<NUM_COMPONENTS; ++k) {
+        posterior_sums[k] = 0;
+        for (i=0; i<data_size; ++i) {
+            posterior_sums[k] += gsl_matrix_get(posterior, i, k);
+        }
+        new_priors[k] = posterior_sums[k] / (double) data_size;
+    }
+
+    // update the means
+    gsl_vector* tmp = gsl_vector_alloc(DIM);
+    for (k=0; k<NUM_COMPONENTS; ++k) {
+        gsl_vector_set_zero(new_means[k]);
+        for (i=0; i<data_size; ++i) {
+            gsl_vector_memcpy(tmp, data[i]);
+            gsl_vector_scale(tmp, gsl_matrix_get(posterior, i, k));
+            gsl_vector_add(new_means[k], tmp);
+        }
+        gsl_vector_scale(new_means[k], 1/posterior_sums[k]);
+    }
+
+    // update the covariances
+    for (k=0; k<NUM_COMPONENTS; ++k) {
+        gsl_matrix_set_zero(new_sigmas[k]);
+        for (i=0; i<data_size; ++i) {
+            // translate the data according to current mean
+            gsl_vector_memcpy(tmp, data[i]);
+            gsl_vector_sub(tmp, new_means[k]);
+            // tmp.T * tmp + general_sigma, stores the result in the lower triangle of general_sigma
+            gsl_blas_dsyr(CblasLower, 1, tmp, new_sigmas[k]);
+        }
+        gsl_matrix_scale(new_sigmas[k], 1/posterior_sums[k]);
     }
 }
