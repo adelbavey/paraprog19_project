@@ -152,6 +152,16 @@ int main(int argl, char* argv[]) {
         //priors, mus, Sigma = maximization_step(data, posterior)
     }
 
+    // output to gmm_out.txt
+    FILE* outfile = fopen("gmm_out.txt", "w");
+
+    for (i = 0; i<NUM_COMPONENTS; ++i) {
+        for (j = 0; j<DIM; ++j) {
+            fprintf(outfile, "%f ", gsl_vector_get(mus[i], j));
+        }
+        fprintf(outfile, "\n");
+    }
+    fclose(outfile);
 
     // clean up
     for (i=0; i<data_size; ++i) {
