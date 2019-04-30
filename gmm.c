@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <math.h>
 
 #include <gsl/gsl_vector.h>
 #include <gsl/gsl_matrix.h>
@@ -56,6 +57,10 @@ void maximization_step(const gsl_vector** data, const unsigned int data_size,
                         double* new_priors, gsl_vector** new_means,
                         gsl_matrix** new_sigmas);
 
+// utility functions for debugging
+void print_vector(gsl_vector* vec);
+void print_matrix(gsl_matrix* mat);
+
 int main(int argl, char* argv[]) {
     int i,j;
     double f;
@@ -68,7 +73,7 @@ int main(int argl, char* argv[]) {
     gsl_vector** data_points = malloc(data_array_size * sizeof(*data_points));
 
     // read in the data
-    FILE* infile = fopen("s1.txt", "r");
+    FILE* infile = fopen("s2.txt", "r");
     if (infile == NULL) {
         perror("Error while opening the input data file.\n");
         exit(EXIT_FAILURE);
@@ -126,6 +131,9 @@ int main(int argl, char* argv[]) {
     // reserve some space
     // "priors" a scalar for each component
     double priors[NUM_COMPONENTS];
+    for (i=0; i<NUM_COMPONENTS; ++i) {
+        priors[i] = 1/(double)NUM_COMPONENTS;
+    }
     // posterior, a number for every pair of data point and component
     gsl_matrix* posterior = gsl_matrix_alloc(data_size, NUM_COMPONENTS);
 
@@ -184,15 +192,36 @@ int main(int argl, char* argv[]) {
 
     // calculate
     for (i=0; i<50; ++i) {
-        printf("step %d\n", i);
+        printf("step %d\n", i+1 );
+        /*
+        printf("mus before:\n%f %f\n%f %f\n%f %f\n%f %f\n",
+                    gsl_vector_get(mus[0], 0),
+                    gsl_vector_get(mus[0], 1),
+                    gsl_vector_get(mus[1], 0),
+                    gsl_vector_get(mus[1], 1),
+                    gsl_vector_get(mus[2], 0),
+                    gsl_vector_get(mus[2], 1),
+                    gsl_vector_get(mus[3], 0),
+                    gsl_vector_get(mus[3], 1));
+        */
         // Expectation step
         expectation_step((const gsl_vector**) data_points, data_size, priors,
                             (const gsl_vector**) mus, (const gsl_matrix**) sigmas,
                             posterior);
-        
         // Maximisation step
         maximization_step((const gsl_vector**) data_points, data_size, posterior,
                             priors, mus, sigmas);
+        
+        printf("mus after:\n%f %f\n%f %f\n%f %f\n%f %f\n",
+                    gsl_vector_get(mus[0], 0),
+                    gsl_vector_get(mus[0], 1),
+                    gsl_vector_get(mus[1], 0),
+                    gsl_vector_get(mus[1], 1),
+                    gsl_vector_get(mus[2], 0),
+                    gsl_vector_get(mus[2], 1),
+                    gsl_vector_get(mus[3], 0),
+                    gsl_vector_get(mus[3], 1));
+        
     }
 
 
@@ -233,6 +262,8 @@ void expectation_step(const gsl_vector** data, const unsigned int data_size,
         double row_sum = 0;
         for (k=0; k<NUM_COMPONENTS; ++k) {
             gsl_ran_multivariate_gaussian_pdf(data[i], means[k], sigmas[k], &probability, workspace);
+//            printf("prob: %.10f\n", probability);
+//            printf("prior of %d: %.10f\n", k, priors[k]);
             gsl_vector_set(current_row, k, priors[k]*probability);
             row_sum += priors[k]*probability;
         }
@@ -261,12 +292,14 @@ void maximization_step(const gsl_vector** data, const unsigned int data_size,
     }
 
     // update the means
+//    printf("one mean: %f %f\n", gsl_vector_get(new_means[0],0), gsl_vector_get(new_means[0],1));
     gsl_vector* tmp = gsl_vector_alloc(DIM);
     for (k=0; k<NUM_COMPONENTS; ++k) {
         gsl_vector_set_zero(new_means[k]);
         for (i=0; i<data_size; ++i) {
             gsl_vector_memcpy(tmp, data[i]);
             gsl_vector_scale(tmp, gsl_matrix_get(posterior, i, k));
+//        k==0?printf("tmp: %f %f\n", gsl_vector_get(tmp,0), gsl_vector_get(tmp,1)):printf("");
             gsl_vector_add(new_means[k], tmp);
         }
         gsl_vector_scale(new_means[k], 1/posterior_sums[k]);
@@ -288,3 +321,24 @@ void maximization_step(const gsl_vector** data, const unsigned int data_size,
     // clean up
     gsl_vector_free(tmp);
 }
+
+
+// utitilities
+void print_vector(gsl_vector* vec) {
+    int i;
+    for (i=0; i<vec->size; ++i) {
+        printf("%f ", gsl_vector_get(vec, i));
+    }
+    printf("\n");
+}
+
+void print_matrix(gsl_matrix* mat) {
+    int i,j;
+    for (i=0; i<mat->size1; ++i) {
+        for (j=0; j<mat->size2; ++j) {
+            printf("%f ", gsl_matrix_get(mat, i, j));
+        }
+        printf("\n");
+    }
+}
+
