@@ -3,6 +3,7 @@
 //
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <assert.h>
 
 #include <gsl/gsl_vector.h>
@@ -57,25 +58,67 @@ void maximization_step(const gsl_vector** data, const unsigned int data_size,
 
 int main(int argl, char* argv[]) {
     int i,j;
+    double f;
 
     // read data
-    // for now use this static one
-    gsl_vector* data_points[5];
-    for (i=0; i<5; ++i) {
-        data_points[i] = gsl_vector_alloc(DIM);
-    }
-    gsl_vector_set(data_points[0], 0, 602013);
-    gsl_vector_set(data_points[0], 1, 574722);
-    gsl_vector_set(data_points[1], 0, 627968);
-    gsl_vector_set(data_points[1], 1, 574625);
-    gsl_vector_set(data_points[2], 0, 607269);
-    gsl_vector_set(data_points[2], 1, 536961);
-    gsl_vector_set(data_points[3], 0, 603145);
-    gsl_vector_set(data_points[3], 1, 574795);
-    gsl_vector_set(data_points[4], 0, 671919);
-    gsl_vector_set(data_points[4], 1, 571761);
+    unsigned int data_size = 0;
 
-    unsigned int data_size = 5;
+    // initial size of the array for the data points
+    size_t data_array_size = 1024;
+    gsl_vector** data_points = malloc(data_array_size * sizeof(*data_points));
+
+    // read in the data
+    FILE* infile = fopen("s1.txt", "r");
+    if (infile == NULL) {
+        perror("Error while opening the input data file.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    char *lineptr = NULL;
+    char *startptr;
+    char *endptr;
+    size_t n = 0;
+    i=0;
+    // get every line in the input file
+    while (getline(&lineptr, &n, infile) != -1) {
+        data_points[i] = gsl_vector_alloc(DIM);
+        ++data_size;
+
+        // extract every double
+        startptr = lineptr;
+        for (j=0; j<DIM; ++j) {
+            f = strtod(startptr, &endptr);
+            if (startptr == endptr) {
+                // no value was read, raise an error
+                printf("Not enough components for input data point %d.\n", i+1);
+                exit(EXIT_FAILURE);
+            }
+            startptr = endptr;
+
+            // store the actual value
+            gsl_vector_set(data_points[i], j, f);
+        }
+        // scan once more to issue a warning if there are more components
+        // in the input data, than expected
+        strtod(startptr, &endptr);
+        if (startptr != endptr) {
+            printf("Ignoring coordinate higher than DIM in input point %d.\n", i+1);
+        }
+
+        ++i;
+        // increase the array size if necessary
+        if (i >= data_array_size) {
+            data_array_size += 1024;
+            if ((data_points = reallocarray(data_points, data_array_size, sizeof(*data_points))) == NULL) {
+                perror("Could not resize data_points array when reading input.\n");
+                exit(EXIT_FAILURE);
+            }
+        }
+    }
+    free(lineptr);
+    lineptr = NULL;
+    fclose(infile);
+
     //TODO: Check that NUM_COMPONENTS < data_size
     assert(NUM_COMPONENTS < data_size);
     //unsigned int DIM = 2;
@@ -141,6 +184,7 @@ int main(int argl, char* argv[]) {
 
     // calculate
     for (i=0; i<50; ++i) {
+        printf("step %d\n", i);
         // Expectation step
         expectation_step((const gsl_vector**) data_points, data_size, priors,
                             (const gsl_vector**) mus, (const gsl_matrix**) sigmas,
@@ -149,8 +193,8 @@ int main(int argl, char* argv[]) {
         // Maximisation step
         maximization_step((const gsl_vector**) data_points, data_size, posterior,
                             priors, mus, sigmas);
-        //priors, mus, Sigma = maximization_step(data, posterior)
     }
+
 
     // output to gmm_out.txt
     FILE* outfile = fopen("gmm_out.txt", "w");
@@ -167,6 +211,7 @@ int main(int argl, char* argv[]) {
     for (i=0; i<data_size; ++i) {
         gsl_vector_free(data_points[i]);
     }
+    free(data_points);
     for (i=0; i<NUM_COMPONENTS; ++i) {
         gsl_vector_free(mus[i]);
         gsl_matrix_free(sigmas[i]);
