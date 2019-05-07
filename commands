@@ -1,0 +1,3 @@
+gcc gmmnew.c -lgsl -lgslcblas -lm -o gmmnew
+./gmmnew 
+python graphify.py

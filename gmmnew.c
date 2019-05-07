@@ -19,11 +19,11 @@
 // global constants, feel free to configure
 //
 // how many components to try to fit onto the data
-const unsigned int NUM_COMPONENTS = 4;
+const unsigned int NUM_COMPONENTS = 8;
 unsigned int NUM_DIMS = 0;
 unsigned int NUM_DATA = 0;
 
-
+//Get number of data points and dimension of points, write to NUM_DATA and NUM_DIMS
 int get_N_D(void){
     FILE * fp;
     char * line = NULL;
@@ -82,7 +82,44 @@ void print_matrix(gsl_matrix* mat) {
     }
 }
 
+//Gaussian pdf, not used currently
+double mvg(const gsl_matrix* x, const gsl_matrix* mean,const gsl_matrix* sigma){
 
+        //Get LU decomp of sigma
+        gsl_matrix* sigmaLU = gsl_matrix_alloc(NUM_DIMS,NUM_DIMS);
+        gsl_matrix_memcpy(sigmaLU, sigma);
+        gsl_permutation* p = gsl_permutation_alloc(NUM_DIMS);
+        int signum = 0;
+        gsl_linalg_LU_decomp(sigmaLU,p,&signum);
+
+        //det of sigma
+        double detSigma = gsl_linalg_LU_det(sigmaLU,signum);
+
+        //Inverse of sigma
+        gsl_matrix* invSigma = gsl_matrix_alloc(NUM_DIMS,NUM_DIMS);
+        gsl_linalg_LU_invert(sigmaLU,p,invSigma);
+
+        //x without mean
+        gsl_matrix* x_nomean = gsl_matrix_alloc(1, NUM_DIMS);
+        gsl_matrix_memcpy(x_nomean,x);
+        gsl_matrix_sub(x_nomean,mean);
+
+        //Calculate exponent value in mvg
+        gsl_matrix* result_matrix1 = gsl_matrix_alloc(NUM_DIMS,1);
+        gsl_matrix* result_matrix2 = gsl_matrix_alloc(1,1);
+        gsl_blas_dgemm(CblasNoTrans,CblasTrans,1,invSigma,x_nomean,0,result_matrix1);
+        gsl_blas_dgemm(CblasNoTrans,CblasNoTrans,1,x_nomean,result_matrix1,0,result_matrix2);
+        double exponent = (-0.5)*gsl_matrix_get(result_matrix2,0,0);
+
+        //Calculate final result
+        double final_result = (1/sqrt( pow(2*M_PI,NUM_DIMS) * detSigma))*exp(exponent);
+        return final_result;
+
+
+
+}
+
+//Initialize parameters
 void initialize_components(const gsl_matrix* data, 
 gsl_matrix* priors, gsl_matrix* means, gsl_matrix** sigmas){
 
@@ -93,8 +130,10 @@ gsl_matrix* priors, gsl_matrix* means, gsl_matrix** sigmas){
     //Init means (non random)
     //gsl_matrix * means = gsl_matrix_alloc(NUM_COMPONENTS,NUM_DIMS);
     for (int i = 0; i < NUM_COMPONENTS; i++)
-    {   gsl_vector tmp = gsl_matrix_const_row(data,i).vector;
-        gsl_matrix_set_row(means,i,&tmp);
+    {   
+        int r = rand()%NUM_DATA;
+        gsl_vector_const_view x_view = gsl_matrix_const_row(data,r);
+        gsl_matrix_set_row(means,i,&x_view.vector);
     }
 
     //Init covariance matrices.
@@ -120,6 +159,7 @@ gsl_matrix* priors, gsl_matrix* means, gsl_matrix** sigmas){
 
 }
 
+//Calculate new posteriors with current parameters
 void expectation_step(const gsl_matrix* data, 
 const gsl_matrix* priors, const gsl_matrix* means, gsl_matrix** sigmas,
 gsl_matrix* posteriors){
@@ -129,38 +169,40 @@ gsl_matrix* posteriors){
 
     for (int data_i = 0; data_i < NUM_DATA; data_i++)
     {
+        double row_sum = 0;
         for (int component_i = 0; component_i < NUM_COMPONENTS; component_i++)
         {
-            gsl_vector_const_view x_view = (gsl_matrix_const_row(data,data_i));
-            gsl_vector_const_view mean_view = (gsl_matrix_const_row(data,component_i));
+            gsl_matrix_const_view x_view = (gsl_matrix_const_submatrix(data,data_i,0,1,NUM_DIMS));
+            gsl_matrix_const_view mean_view = (gsl_matrix_const_submatrix(data,component_i,0,1,NUM_DIMS));
+            //gsl_vector_const_view x_view = (gsl_matrix_const_row(data,data_i));
+            //gsl_vector_const_view mean_view = (gsl_matrix_const_row(data,component_i));
             const gsl_matrix* sigma = sigmas[component_i];
 
             //Cholesky
             gsl_matrix * sigma_chol = gsl_matrix_alloc(NUM_DIMS,NUM_DIMS);
             gsl_matrix_memcpy(sigma_chol,sigma);
             //print_matrix(sigma);
-            gsl_linalg_cholesky_decomp(sigma_chol);
+            gsl_linalg_cholesky_decomp1(sigma_chol);
 
             //Get pdf value
-            gsl_ran_multivariate_gaussian_pdf(&x_view.vector,&mean_view.vector,sigma_chol,&result,work);
+            //gsl_ran_multivariate_gaussian_pdf(&x_view.vector,&mean_view.vector,sigma_chol,&result,work);
+            result = mvg(&x_view.matrix,&mean_view.matrix,sigma);
+            //printf("%f",result);
 
             gsl_matrix_set(posteriors,data_i,component_i,gsl_matrix_get(priors,0,component_i)*result);
+            row_sum += gsl_matrix_get(priors,0,component_i)*result;
         }
 
-        //Normalize the row in posteriors
-        gsl_vector posterior_row = (gsl_matrix_row(posteriors,data_i).vector);
-        double row_sum = 0;
-        gsl_vector* ones = gsl_vector_alloc(NUM_COMPONENTS);
-        gsl_vector_set_all(ones, 1);
-        gsl_blas_ddot(&posterior_row, ones,&row_sum);
-        gsl_vector_scale(&posterior_row,1.0/row_sum);
-        gsl_matrix_set_row(posteriors,data_i,&posterior_row);
+        gsl_vector_view posterior_row = gsl_matrix_row(posteriors,data_i);
+        gsl_vector_scale(&posterior_row.vector,1.0/row_sum);
+
         
     }
     
 
 }
 
+//Calculate new parameters with current posteriors
 void maximization_step(const gsl_matrix* data, 
 gsl_matrix* priors, gsl_matrix* means, gsl_matrix** sigmas,
 const gsl_matrix* posteriors){
@@ -207,6 +249,7 @@ const gsl_matrix* posteriors){
             gsl_matrix* x_cpy = gsl_matrix_alloc(1,NUM_DIMS);
             gsl_matrix_memcpy(x_cpy,&x_view.matrix);
             gsl_matrix_sub(x_cpy,&u_view.matrix);
+
             gsl_matrix* xx = gsl_matrix_alloc(NUM_DIMS,NUM_DIMS);
             gsl_blas_dgemm(CblasTrans,CblasNoTrans,1,x_cpy,x_cpy,0,xx);
             gsl_matrix_scale(xx,gsl_matrix_get(posteriors,data_i,component_i));
@@ -222,6 +265,8 @@ const gsl_matrix* posteriors){
 
     
 }
+
+
 
 int main(int argl, char* argv[]){
 
@@ -242,14 +287,27 @@ int main(int argl, char* argv[]){
     
 
     //EM ALGORITHM
-    for (int iter = 0; iter < 5; iter++)
+    for (int iter = 0; iter < 1; iter++)
     {
-        print_matrix(posteriors);
+        print_matrix(sigmas[0]);
         printf("\n");
         expectation_step(data,priors,means,sigmas,posteriors);
-        
         maximization_step(data,priors,means,sigmas,posteriors);
+
+        print_matrix(sigmas[0]);
+
         
+        
+    }
+
+    // output to gmm_out.txt
+    FILE* outfile = fopen("gmm_out.txt", "w");
+
+    for (int i = 0; i<NUM_COMPONENTS; ++i) {
+        for (int j = 0; j<NUM_DIMS; ++j) {
+            fprintf(outfile, "%f ", gsl_matrix_get(means, i, j));
+        }
+        fprintf(outfile, "\n");
     }
     //print_matrix(means);
     
