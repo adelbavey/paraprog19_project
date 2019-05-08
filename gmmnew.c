@@ -8,6 +8,7 @@
 #include <math.h>
 #include <string.h>
 #include <ctype.h>
+#include <time.h>
 
 #include <gsl/gsl_vector.h>
 #include <gsl/gsl_matrix.h>
@@ -19,7 +20,7 @@
 // global constants, feel free to configure
 //
 // how many components to try to fit onto the data
-const unsigned int NUM_COMPONENTS = 8;
+const unsigned int NUM_COMPONENTS = 12;
 unsigned int NUM_DIMS = 0;
 unsigned int NUM_DATA = 0;
 
@@ -141,14 +142,45 @@ gsl_matrix* priors, gsl_matrix* means, gsl_matrix** sigmas){
     //gsl_matrix* sigmas[NUM_COMPONENTS];
 
     gsl_matrix* init_sigma = gsl_matrix_alloc(NUM_DIMS,NUM_DIMS);
+    gsl_matrix_set_all(init_sigma,0);
+    /*
     for (int i = 0; i < NUM_DIMS; i++)
     {
         for (int j = 0; j < NUM_DIMS; j++)
         {
-            double cov = gsl_stats_covariance(gsl_matrix_const_column(data,i).vector.data,1,gsl_matrix_const_column(data,j).vector.data,1,NUM_DATA);
+            double cov = ((NUM_DATA-1.0)/NUM_DATA)*gsl_stats_covariance(gsl_matrix_const_column(data,i).vector.data,1,gsl_matrix_const_column(data,j).vector.data,1,NUM_DATA);
+            //cov/= NUM_COMPONENTS*10;
             gsl_matrix_set(init_sigma,i,j,cov);
         }
     }
+    */
+
+   
+   //Matrix with one row and n cols, filled with 1
+    gsl_matrix* ones = gsl_matrix_alloc(1,NUM_DATA);
+    gsl_matrix_set_all(ones, 1);
+
+    //sample mean
+    gsl_matrix* sample_mean = gsl_matrix_alloc(1,NUM_DIMS);
+    gsl_blas_dgemm(CblasNoTrans,CblasNoTrans,1,ones,data,0,sample_mean);
+    gsl_matrix_scale(sample_mean,1.0/NUM_DATA);
+
+    //sum individual vars
+    for (int data_i = 0; data_i < NUM_DATA; data_i++)
+    {
+        gsl_matrix_const_view data_point_view = gsl_matrix_const_submatrix(data,data_i,0,1,NUM_DIMS);
+
+        gsl_matrix* data_point_nomean = gsl_matrix_alloc(1,NUM_DIMS);
+        gsl_matrix_memcpy(data_point_nomean,&data_point_view.matrix);
+        gsl_matrix_sub(data_point_nomean,sample_mean);
+
+        gsl_matrix* result = gsl_matrix_alloc(NUM_DIMS,NUM_DIMS);
+        gsl_blas_dgemm(CblasTrans,CblasNoTrans,1,data_point_nomean,data_point_nomean,0,result);
+
+        gsl_matrix_add(init_sigma,result);
+    }
+    gsl_matrix_scale(init_sigma,1.0/NUM_DATA);
+    
     
     for (int i = 0; i < NUM_COMPONENTS; i++)
     {
@@ -173,7 +205,7 @@ gsl_matrix* posteriors){
         for (int component_i = 0; component_i < NUM_COMPONENTS; component_i++)
         {
             gsl_matrix_const_view x_view = (gsl_matrix_const_submatrix(data,data_i,0,1,NUM_DIMS));
-            gsl_matrix_const_view mean_view = (gsl_matrix_const_submatrix(data,component_i,0,1,NUM_DIMS));
+            gsl_matrix_const_view mean_view = (gsl_matrix_const_submatrix(means,component_i,0,1,NUM_DIMS));
             //gsl_vector_const_view x_view = (gsl_matrix_const_row(data,data_i));
             //gsl_vector_const_view mean_view = (gsl_matrix_const_row(data,component_i));
             const gsl_matrix* sigma = sigmas[component_i];
@@ -251,8 +283,8 @@ const gsl_matrix* posteriors){
             gsl_matrix_sub(x_cpy,&u_view.matrix);
 
             gsl_matrix* xx = gsl_matrix_alloc(NUM_DIMS,NUM_DIMS);
-            gsl_blas_dgemm(CblasTrans,CblasNoTrans,1,x_cpy,x_cpy,0,xx);
-            gsl_matrix_scale(xx,gsl_matrix_get(posteriors,data_i,component_i));
+            gsl_blas_dgemm(CblasTrans,CblasNoTrans, gsl_matrix_get(posteriors,data_i,component_i) ,x_cpy,x_cpy,0,xx);
+            //gsl_matrix_scale(xx,gsl_matrix_get(posteriors,data_i,component_i));
 
             gsl_matrix_add(new_sigmas[component_i],xx);
             posterior_sum += gsl_matrix_get(posteriors,data_i,component_i);
@@ -270,6 +302,8 @@ const gsl_matrix* posteriors){
 
 int main(int argl, char* argv[]){
 
+    srand(time(NULL));
+
     //Get number of data points and dims
     get_N_D();
 
@@ -280,21 +314,25 @@ int main(int argl, char* argv[]){
 
     //Allocate component memory and initialize
     gsl_matrix * priors = gsl_matrix_alloc(1,NUM_COMPONENTS);
+    
     gsl_matrix * means = gsl_matrix_alloc(NUM_COMPONENTS,NUM_DIMS);
     gsl_matrix* sigmas[NUM_COMPONENTS];
     gsl_matrix* posteriors = gsl_matrix_alloc(NUM_DATA,NUM_COMPONENTS);
     initialize_components(data,priors,means,sigmas);
+    //print_matrix(means);
     
-
+    //print_matrix(sigmas[0]);
     //EM ALGORITHM
-    for (int iter = 0; iter < 1; iter++)
+    for (int iter = 0; iter < 30; iter++)
     {
-        print_matrix(sigmas[0]);
-        printf("\n");
+        //print_matrix(means);
+        //printf("\n");
         expectation_step(data,priors,means,sigmas,posteriors);
+        //print_matrix(posteriors);
         maximization_step(data,priors,means,sigmas,posteriors);
+        //print_matrix(priors);
 
-        print_matrix(sigmas[0]);
+        
 
         
         
