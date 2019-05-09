@@ -354,11 +354,6 @@ int main(int argl, char* argv[]){
         //print_matrix(posteriors);
         maximization_step(data,priors,means,sigmas,posteriors);
         //print_matrix(priors);
-
-        
-
-        
-        
     }
 
     // output to gmm_out.txt
