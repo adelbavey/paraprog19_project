@@ -28,6 +28,8 @@ const unsigned int NUM_COMPONENTS = 15;
 unsigned int NUM_DIMS = 0;
 unsigned int NUM_DATA = 0;
 
+const char* input_name = "birch3.txt";
+
 // our rank and the toal number of processors as global variables
 int rank, num_processors;
 
@@ -38,7 +40,7 @@ void get_N_D(void){
     size_t len = 0;
     size_t read;
 
-    fp = fopen("s2.txt", "r");
+    fp = fopen(input_name, "r");
     if (fp == NULL)
         exit(EXIT_FAILURE);
 
@@ -332,7 +334,7 @@ int main(int argl, char* argv[]){
     get_N_D();
 
     //Get data
-    FILE * fp = fopen("s2.txt", "r");
+    FILE * fp = fopen(input_name, "r");
     gsl_matrix * data = gsl_matrix_alloc (NUM_DATA, NUM_DIMS);
     gsl_matrix_fscanf(fp, data);
 
