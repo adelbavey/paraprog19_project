@@ -24,11 +24,11 @@
 // global constants, feel free to configure
 //
 // how many components to try to fit onto the data
-const unsigned int NUM_COMPONENTS = 15;
+const unsigned int NUM_COMPONENTS = 8;
 unsigned int NUM_DIMS = 0;
 unsigned int NUM_DATA = 0;
 
-const char input_name[] = "dim15.txt";
+const char input_name[] = "dim4.txt";
 
 // our rank and the toal number of processors as global variables
 int rank, num_processors;
@@ -233,10 +233,10 @@ gsl_matrix* posteriors){
             const gsl_matrix* sigma = sigmas[component_i];
 
             //Cholesky
-            gsl_matrix * sigma_chol = gsl_matrix_alloc(NUM_DIMS,NUM_DIMS);
-            gsl_matrix_memcpy(sigma_chol,sigma);
+            //gsl_matrix * sigma_chol = gsl_matrix_alloc(NUM_DIMS,NUM_DIMS);
+            //gsl_matrix_memcpy(sigma_chol,sigma);
             //print_matrix(sigma);
-            gsl_linalg_cholesky_decomp1(sigma_chol);
+            //gsl_linalg_cholesky_decomp1(sigma_chol);
 
             //Get pdf value
             //gsl_ran_multivariate_gaussian_pdf(&x_view.vector,&mean_view.vector,sigma_chol,&result,work);
@@ -246,7 +246,7 @@ gsl_matrix* posteriors){
             gsl_matrix_set(posteriors,data_i,component_i,gsl_matrix_get(priors,0,component_i)*result);
             row_sum += gsl_matrix_get(priors,0,component_i)*result;
 
-            gsl_matrix_free(sigma_chol);
+            //gsl_matrix_free(sigma_chol);
         }
 
         gsl_vector_view posterior_row = gsl_matrix_row(posteriors,data_i);
