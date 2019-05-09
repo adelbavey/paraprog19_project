@@ -135,11 +135,13 @@ gsl_matrix* priors, gsl_matrix* means, gsl_matrix** sigmas){
     //gsl_vector * priors = gsl_vector_alloc(NUM_COMPONENTS);
     gsl_matrix_set_all(priors, 1.0/NUM_COMPONENTS);
 
+    int randint = 0;
+
     //Init means (non random)
     //gsl_matrix * means = gsl_matrix_alloc(NUM_COMPONENTS,NUM_DIMS);
     for (int i = 0; i < NUM_COMPONENTS; i++)
     {   
-        int r = rand()%NUM_DATA;
+        int r = rand_r(&randint)%NUM_DATA;
         gsl_vector_const_view x_view = gsl_matrix_const_row(data,r);
         gsl_matrix_set_row(means,i,&x_view.vector);
     }
@@ -319,7 +321,12 @@ int main(int argl, char* argv[]){
     int rc;
 
     // initialise random number generator
-    srandom(time(NULL));
+    //srandom(time(NULL));
+    
+    // initialise and setup MPI
+    rc = MPI_Init(&argl, &argv);
+    rc = MPI_Comm_size(MPI_COMM_WORLD, &num_processors);
+    rc = MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     //Get number of data points and dims
     get_N_D();
@@ -337,11 +344,6 @@ int main(int argl, char* argv[]){
     gsl_matrix* posteriors = gsl_matrix_alloc(NUM_DATA,NUM_COMPONENTS);
     initialize_components(data,priors,means,sigmas);
     //print_matrix(means);
-    
-    // initialise and setup MPI
-    rc = MPI_Init(&argl, &argv);
-    rc = MPI_Comm_size(MPI_COMM_WORLD, &num_processors);
-    rc = MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     //print_matrix(sigmas[0]);
     //EM ALGORITHM
@@ -355,16 +357,20 @@ int main(int argl, char* argv[]){
         //print_matrix(priors);
     }
 
-    // output to gmm_out.txt
-    FILE* outfile = fopen("gmm_out.txt", "w");
+    // only output if we're the root process
+    if (rank == 0) {
+        // output to gmm_out.txt
+        FILE* outfile = fopen("gmm_out.txt", "w");
 
-    for (int i = 0; i<NUM_COMPONENTS; ++i) {
-        for (int j = 0; j<NUM_DIMS; ++j) {
-            fprintf(outfile, "%f ", gsl_matrix_get(means, i, j));
+        for (int i = 0; i<NUM_COMPONENTS; ++i) {
+            for (int j = 0; j<NUM_DIMS; ++j) {
+                fprintf(outfile, "%f ", gsl_matrix_get(means, i, j));
+            }
+            fprintf(outfile, "\n");
         }
-        fprintf(outfile, "\n");
+        //print_matrix(means);
+
     }
-    //print_matrix(means);
     
     rc = MPI_Finalize();
     return rc;
