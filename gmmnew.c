@@ -28,7 +28,7 @@ const unsigned int NUM_COMPONENTS = 15;
 unsigned int NUM_DIMS = 0;
 unsigned int NUM_DATA = 0;
 
-const char input_name[] = "europediff.txt";
+const char input_name[] = "locs_finland.txt";
 
 // our rank and the toal number of processors as global variables
 int rank, num_processors;

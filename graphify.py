@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 #data_in = np.reshape(data_in, (2,-1))
 #print(data_in)
 
-data = np.loadtxt("europediff.txt")
+data = np.loadtxt("locs_finland.txt")
 mu = np.loadtxt("gmm_out.txt")
 l = plt.scatter(data[:,0],data[:,1])
 plt.scatter(mu[:,0],mu[:,1])
