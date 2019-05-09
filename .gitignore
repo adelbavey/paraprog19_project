@@ -1,5 +1,7 @@
 # ignore binary
 gmm
+gmmnew
 *.bin
 *.o
 *out*
+*.png

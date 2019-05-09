@@ -38,7 +38,7 @@ gsl_matrix* means, const gsl_matrix* posteriors, gsl_matrix* new_sigma) {
 
     gsl_matrix* xx = gsl_matrix_alloc(NUM_DIMS,NUM_DIMS);
     gsl_matrix* x_cpy = gsl_matrix_alloc(1,NUM_DIMS);
-    for (int data_i = local_offset; data_i < local_size; data_i++)
+    for (int data_i = local_offset; data_i < local_offset + local_size; data_i++)
     {
         gsl_matrix_const_view x_view = gsl_matrix_const_submatrix(data,data_i,0,1,NUM_DIMS);
         gsl_matrix_const_view u_view = gsl_matrix_const_submatrix(means,component_i,0,1,NUM_DIMS);

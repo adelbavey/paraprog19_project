@@ -24,7 +24,7 @@
 // global constants, feel free to configure
 //
 // how many components to try to fit onto the data
-const unsigned int NUM_COMPONENTS = 12;
+const unsigned int NUM_COMPONENTS = 15;
 unsigned int NUM_DIMS = 0;
 unsigned int NUM_DATA = 0;
 
@@ -135,7 +135,7 @@ gsl_matrix* priors, gsl_matrix* means, gsl_matrix** sigmas){
     //gsl_vector * priors = gsl_vector_alloc(NUM_COMPONENTS);
     gsl_matrix_set_all(priors, 1.0/NUM_COMPONENTS);
 
-    int randint = 0;
+    unsigned int randint = 0;
 
     //Init means (non random)
     //gsl_matrix * means = gsl_matrix_alloc(NUM_COMPONENTS,NUM_DIMS);
