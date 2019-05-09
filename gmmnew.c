@@ -17,6 +17,10 @@
 #include <gsl/gsl_linalg.h>
 #include <gsl/gsl_randist.h>
 
+#include <mpi.h>
+
+#include "parallel.c"
+
 // global constants, feel free to configure
 //
 // how many components to try to fit onto the data
@@ -24,8 +28,11 @@ const unsigned int NUM_COMPONENTS = 12;
 unsigned int NUM_DIMS = 0;
 unsigned int NUM_DATA = 0;
 
+// our rank and the toal number of processors as global variables
+int rank, num_processors;
+
 //Get number of data points and dimension of points, write to NUM_DATA and NUM_DIMS
-int get_N_D(void){
+void get_N_D(void){
     FILE * fp;
     char * line = NULL;
     size_t len = 0;
@@ -196,7 +203,7 @@ void expectation_step(const gsl_matrix* data,
 const gsl_matrix* priors, const gsl_matrix* means, gsl_matrix** sigmas,
 gsl_matrix* posteriors){
 
-    gsl_vector * work = gsl_vector_alloc(NUM_DIMS);
+    //gsl_vector * work = gsl_vector_alloc(NUM_DIMS);
     double result = 0;
 
     for (int data_i = 0; data_i < NUM_DATA; data_i++)
@@ -274,6 +281,8 @@ const gsl_matrix* posteriors){
 
         double posterior_sum = 0;
 
+        /*
+        // parallelise this
         for (int data_i = 0; data_i < NUM_DATA; data_i++)
         {
             gsl_matrix_const_view x_view = gsl_matrix_const_submatrix(data,data_i,0,1,NUM_DIMS);
@@ -289,20 +298,26 @@ const gsl_matrix* posteriors){
             gsl_matrix_add(new_sigmas[component_i],xx);
             posterior_sum += gsl_matrix_get(posteriors,data_i,component_i);
         }
+        */
+        posterior_sum = parallel_sum(component_i, data, means, posteriors, new_sigmas[component_i]);
 
         gsl_matrix_scale(new_sigmas[component_i],1.0/posterior_sum);
         
         gsl_matrix_memcpy(sigmas[component_i],new_sigmas[component_i]);
+        gsl_matrix_free(new_sigmas[component_i]);
     }
+
+    gsl_matrix_free(ones);
+    gsl_matrix_free(mean_divisor);
 
     
 }
 
 
-
 int main(int argl, char* argv[]){
 
-    srand(time(NULL));
+    int rc;
+
 
     //Get number of data points and dims
     get_N_D();
@@ -321,6 +336,14 @@ int main(int argl, char* argv[]){
     initialize_components(data,priors,means,sigmas);
     //print_matrix(means);
     
+    // initialise and setup MPI
+    rc = MPI_Init(&argl, &argv);
+    rc = MPI_Comm_size(MPI_COMM_WORLD, &num_processors);
+    rc = MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    // initialise random number generator
+    srandom(rank+1 + time(NULL));
+
     //print_matrix(sigmas[0]);
     //EM ALGORITHM
     for (int iter = 0; iter < 30; iter++)
@@ -349,7 +372,8 @@ int main(int argl, char* argv[]){
     }
     //print_matrix(means);
     
-
+    rc = MPI_Finalize();
+    return rc;
 
 }
 
