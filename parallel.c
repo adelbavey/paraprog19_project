@@ -34,7 +34,8 @@ gsl_matrix* means, const gsl_matrix* posteriors, gsl_matrix* new_sigma) {
     if (rank < NUM_DATA % num_processors) {
         ++local_size;
     }
-    size_t local_offset = rank * NUM_DATA / num_processors + min(rank, NUM_DATA % num_processors);
+    size_t local_offset = rank * (NUM_DATA / num_processors) + min(rank, NUM_DATA % num_processors);
+    //printf("%d: [%zu, %zu), D=%zu, res=%d\n", rank, local_offset, local_offset+local_size, local_size, NUM_DATA % num_processors);
 
     gsl_matrix* xx = gsl_matrix_alloc(NUM_DIMS,NUM_DIMS);
     gsl_matrix* x_cpy = gsl_matrix_alloc(1,NUM_DIMS);
