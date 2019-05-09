@@ -318,6 +318,8 @@ int main(int argl, char* argv[]){
 
     int rc;
 
+    // initialise random number generator
+    srandom(time(NULL));
 
     //Get number of data points and dims
     get_N_D();
@@ -340,9 +342,6 @@ int main(int argl, char* argv[]){
     rc = MPI_Init(&argl, &argv);
     rc = MPI_Comm_size(MPI_COMM_WORLD, &num_processors);
     rc = MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
-    // initialise random number generator
-    srandom(rank+1 + time(NULL));
 
     //print_matrix(sigmas[0]);
     //EM ALGORITHM
