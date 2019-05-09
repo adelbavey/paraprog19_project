@@ -70,6 +70,7 @@ gsl_matrix* means, const gsl_matrix* posteriors, gsl_matrix* new_sigma) {
     // free allocated space
     gsl_matrix_free(xx);
     gsl_matrix_free(x_cpy);
+    gsl_matrix_free(local_sigma);
 
 
     return result;

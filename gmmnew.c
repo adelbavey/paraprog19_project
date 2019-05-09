@@ -123,6 +123,12 @@ double mvg(const gsl_matrix* x, const gsl_matrix* mean,const gsl_matrix* sigma){
 
         //Calculate final result
         double final_result = (1/sqrt( pow(2*M_PI,NUM_DIMS) * detSigma))*exp(exponent);
+        gsl_matrix_free(sigmaLU);
+        gsl_permutation_free(p);
+        gsl_matrix_free(invSigma);
+        gsl_matrix_free(x_nomean);
+        gsl_matrix_free(result_matrix1);
+        gsl_matrix_free(result_matrix2);
         return final_result;
 
 
@@ -176,6 +182,8 @@ gsl_matrix* priors, gsl_matrix* means, gsl_matrix** sigmas){
     gsl_blas_dgemm(CblasNoTrans,CblasNoTrans,1,ones,data,0,sample_mean);
     gsl_matrix_scale(sample_mean,1.0/NUM_DATA);
 
+    gsl_matrix_free(ones);
+
     //sum individual vars
     for (int data_i = 0; data_i < NUM_DATA; data_i++)
     {
@@ -189,6 +197,9 @@ gsl_matrix* priors, gsl_matrix* means, gsl_matrix** sigmas){
         gsl_blas_dgemm(CblasTrans,CblasNoTrans,1,data_point_nomean,data_point_nomean,0,result);
 
         gsl_matrix_add(init_sigma,result);
+
+        gsl_matrix_free(data_point_nomean);
+        gsl_matrix_free(result);
     }
     gsl_matrix_scale(init_sigma,1.0/NUM_DATA);
     
@@ -234,6 +245,8 @@ gsl_matrix* posteriors){
 
             gsl_matrix_set(posteriors,data_i,component_i,gsl_matrix_get(priors,0,component_i)*result);
             row_sum += gsl_matrix_get(priors,0,component_i)*result;
+
+            gsl_matrix_free(sigma_chol);
         }
 
         gsl_vector_view posterior_row = gsl_matrix_row(posteriors,data_i);
@@ -373,7 +386,16 @@ int main(int argl, char* argv[]){
         //print_matrix(means);
 
     }
-    
+
+    gsl_matrix_free(data);
+    gsl_matrix_free(priors);
+    gsl_matrix_free(means);
+    gsl_matrix_free(posteriors);
+    for (int i=0; i<NUM_COMPONENTS; ++i) {
+        gsl_matrix_free(sigmas[i]);
+    }
+
+
     rc = MPI_Finalize();
     return rc;
 
