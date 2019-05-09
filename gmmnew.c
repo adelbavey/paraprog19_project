@@ -24,11 +24,11 @@
 // global constants, feel free to configure
 //
 // how many components to try to fit onto the data
-const unsigned int NUM_COMPONENTS = 8;
+const unsigned int NUM_COMPONENTS = 15;
 unsigned int NUM_DIMS = 0;
 unsigned int NUM_DATA = 0;
 
-const char input_name[] = "dim4.txt";
+const char input_name[] = "s1.txt";
 
 // our rank and the toal number of processors as global variables
 int rank, num_processors;
