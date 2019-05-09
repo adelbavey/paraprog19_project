@@ -28,7 +28,7 @@ const unsigned int NUM_COMPONENTS = 15;
 unsigned int NUM_DIMS = 0;
 unsigned int NUM_DATA = 0;
 
-const char* input_name = "birch3.txt";
+const char input_name[] = "birch3.txt";
 
 // our rank and the toal number of processors as global variables
 int rank, num_processors;
@@ -360,10 +360,18 @@ int main(int argl, char* argv[]){
     initialize_components(data,priors,means,sigmas);
     //print_matrix(means);
 
+    if (rank == 0) {
+        printf("Read %d data points from file \"%s\". Starting calculations with %d components.\n",
+                    NUM_DATA, input_name, NUM_COMPONENTS);
+        //fflush(stdout);
+    }
     //print_matrix(sigmas[0]);
     //EM ALGORITHM
     for (int iter = 0; iter < 30; iter++)
     {
+        if (rank == 0) {
+            printf("step: %d\n", iter);
+        }
         //print_matrix(means);
         //printf("\n");
         expectation_step(data,priors,means,sigmas,posteriors);
